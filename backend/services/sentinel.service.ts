@@ -2,6 +2,8 @@ import axios from "axios";
 
 export async function getAccessToken() {
   const response = await axios.post(
+
+    
     "https://services.sentinel-hub.com/oauth/token",
     new URLSearchParams({
       grant_type: "client_credentials",
@@ -19,11 +21,20 @@ export async function getAccessToken() {
   return response.data.access_token;
 }
 
+
 export async function getNDVIImage(
   geojson: any
 ) {
   const token =
     await getAccessToken();
+
+  const today = new Date();
+
+  const from = new Date();
+
+  from.setDate(
+    today.getDate() - 30
+  );
 
   const coordinates =
     geojson.geometry.coordinates[0];
@@ -67,14 +78,15 @@ export async function getNDVIImage(
               dataFilter: {
                 timeRange: {
                   from:
-                    "2026-05-21T00:00:00Z",
+                    from.toISOString(),
 
                   to:
-                    "2026-05-25T23:59:59Z",
+                    today.toISOString(),
                 },
 
                 maxCloudCoverage:
                   20,
+                  mosaickingOrder: "leastCC",
               },
             },
           ],
@@ -110,7 +122,6 @@ export async function getNDVIImage(
         }
 
         const colorRamp = [
-
           [-1.0, [0.55, 0.27, 0.07]],
           [0.0,  [0.8, 0.2, 0.0]],
           [0.2,  [1.0, 0.6, 0.0]],
@@ -119,7 +130,6 @@ export async function getNDVIImage(
           [0.65, [0.2, 0.8, 0.2]],
           [0.8,  [0.0, 0.5, 0.0]],
           [1.0,  [0.0, 0.3, 0.0]]
-
         ];
 
         function interpolate(
@@ -232,7 +242,7 @@ export async function getNDVIImage(
     ndviMax: 0.91,
 
     imageDate:
-      new Date()
+      today
         .toISOString()
         .split("T")[0],
   };
@@ -241,9 +251,158 @@ export async function getNDVIImage(
 export async function getNDVIStats(
   geojson: any
 ) {
-  console.log(
-    "Função de estatísticas ainda será implementada."
+  const token =
+    await getAccessToken();
+
+  const today = new Date();
+
+  const from = new Date();
+
+  from.setDate(
+    today.getDate() - 30
   );
 
-  return null;
+  try {
+
+    const response =
+      await axios.post(
+        "https://services.sentinel-hub.com/api/v1/statistics",
+        {
+          input: {
+            bounds: {
+              geometry:
+                geojson.geometry,
+
+              properties: {
+                crs:
+                  "http://www.opengis.net/def/crs/EPSG/0/4326",
+              },
+            },
+
+            data: [
+              {
+                type:
+                  "sentinel-2-l2a",
+
+                dataFilter: {
+                  timeRange: {
+                    from:
+                      from.toISOString(),
+
+                    to:
+                      today.toISOString(),
+                  },
+
+                  maxCloudCoverage:
+                    20,
+
+                  mosaickingOrder:
+                    "leastCC",
+                },
+              },
+            ],
+          },
+
+          aggregation: {
+            timeRange: {
+              from:
+                from.toISOString(),
+
+              to:
+                today.toISOString(),
+            },
+
+            aggregationInterval: {
+              of: "P30D",
+            },
+
+            evalscript: `
+            //VERSION=3
+
+            function setup() {
+              return {
+                input: [{
+                  bands: [
+                    "B04",
+                    "B08",
+                    "dataMask"
+                  ]
+                }],
+
+                output: [
+                  {
+                    id: "default",
+                    bands: 1,
+                    sampleType: "FLOAT32"
+                  },
+                  {
+                    id: "dataMask",
+                    bands: 1
+                  }
+                ]
+              };
+            }
+
+            function evaluatePixel(
+              sample
+            ) {
+
+              const ndvi =
+                (sample.B08 -
+                  sample.B04) /
+                (sample.B08 +
+                  sample.B04);
+
+              return {
+                default: [ndvi],
+                dataMask: [
+                  sample.dataMask
+                ]
+              };
+            }
+            `,
+          },
+        },
+        {
+          headers: {
+            Authorization:
+              `Bearer ${token}`,
+
+            "Content-Type":
+              "application/json",
+          },
+        }
+      );
+
+    console.log(
+      "PIXELS:",
+      response.data.geometryPixelCount
+    );
+
+    console.log(
+      JSON.stringify(
+        response.data,
+        null,
+        2
+      )
+    );
+
+    return response.data;
+
+  } catch (error: any) {
+
+    console.log(
+      "STATISTICS ERROR:"
+    );
+
+    console.log(
+      JSON.stringify(
+        error?.response?.data,
+        null,
+        2
+      )
+    );
+
+    return null;
+  }
 }

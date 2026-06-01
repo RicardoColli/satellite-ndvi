@@ -14,51 +14,51 @@ router.post("/area", async (req, res) => {
     const image =
       await getNDVIImage(area);
 
-    try {
+    const stats =
+      await getNDVIStats(area);
 
-      const stats =
-        await getNDVIStats(area);
+    console.log(
+      "===== STATS ====="
+    );
 
-      console.log(
-        "NDVI Stats:"
-      );
+    console.log(
+  JSON.stringify(
+    stats,
+    null,
+    2
+  )
+);
 
-      console.log(
-        JSON.stringify(
-          stats,
-          null,
-          2
-        )
-      );
+    const bandStats =
+        stats?.data?.[0]?.outputs?.default?.bands?.B0?.stats;
 
-    } catch (statsError: any) {
+      return res.json({
+        ...image,
 
-      console.log(
-        "Erro ao obter estatísticas:"
-      );
+        ndviMean:
+          bandStats?.mean ?? null,
 
-      console.log(
-        statsError?.response?.data?.toString?.() ||
-        statsError
-      );
-    }
+        ndviMin:
+          bandStats?.min ?? null,
 
-    return res.json(image);
+        ndviMax:
+          bandStats?.max ?? null,
+      });
 
   } catch (error: any) {
 
     console.log(
-      "Erro principal:"
+      "ROUTE ERROR:"
     );
 
     console.log(
-      error?.response?.data?.toString?.() ||
-      error
+      error?.response?.data ||
+      error.message
     );
 
     return res.status(500).json({
       error:
-        "Erro ao gerar NDVI",
+        "Erro ao gerar NDVI"
     });
   }
 });

@@ -1,6 +1,10 @@
 import { Router } from "express";
 
 import {
+  saveAnalysis,
+} from "../../services/analysis.service";
+
+import {
   getNDVIImage,
   getNDVIStats,
 } from "../../services/sentinel.service";
@@ -22,28 +26,68 @@ router.post("/area", async (req, res) => {
     );
 
     console.log(
-  JSON.stringify(
-    stats,
-    null,
-    2
-  )
-);
+      JSON.stringify(
+        stats,
+        null,
+        2
+      )
+    );
 
     const bandStats =
-        stats?.data?.[0]?.outputs?.default?.bands?.B0?.stats;
+      stats?.data?.[0]
+        ?.outputs?.default
+        ?.bands?.B0?.stats;
 
-      return res.json({
-        ...image,
+    const ndviMean =
+      bandStats?.mean ?? null;
 
-        ndviMean:
-          bandStats?.mean ?? null,
+    const ndviMin =
+      bandStats?.min ?? null;
 
-        ndviMin:
-          bandStats?.min ?? null,
+    const ndviMax =
+      bandStats?.max ?? null;
 
-        ndviMax:
-          bandStats?.max ?? null,
-      });
+    const imageDate =
+      stats?.data?.[0]
+        ?.interval?.from
+        ?.split("T")[0] ??
+      new Date()
+        .toISOString()
+        .split("T")[0];
+
+    await saveAnalysis({
+      area_ha:
+        image.areaHa,
+
+      ndvi_mean:
+        ndviMean,
+
+      ndvi_min:
+        ndviMin,
+
+      ndvi_max:
+        ndviMax,
+
+      image_date:
+        imageDate,
+
+      geometry:
+        area.geometry,
+    });
+
+    return res.json({
+      image:
+        image.image,
+
+      areaHa:
+        image.areaHa,
+
+      ndviMean,
+      ndviMin,
+      ndviMax,
+
+      imageDate,
+    });
 
   } catch (error: any) {
 
@@ -58,7 +102,7 @@ router.post("/area", async (req, res) => {
 
     return res.status(500).json({
       error:
-        "Erro ao gerar NDVI"
+        "Erro ao gerar NDVI",
     });
   }
 });

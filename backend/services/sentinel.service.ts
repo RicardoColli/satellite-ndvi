@@ -2,8 +2,6 @@ import axios from "axios";
 
 export async function getAccessToken() {
   const response = await axios.post(
-
-    
     "https://services.sentinel-hub.com/oauth/token",
     new URLSearchParams({
       grant_type: "client_credentials",
@@ -20,7 +18,6 @@ export async function getAccessToken() {
 
   return response.data.access_token;
 }
-
 
 export async function getNDVIImage(
   geojson: any
@@ -56,6 +53,16 @@ export async function getNDVIImage(
     Math.max(...latitudes),
   ];
 
+  const areaHa =
+    (
+      Math.abs(
+        (bbox[2] - bbox[0]) *
+        (bbox[3] - bbox[1])
+      ) *
+      111 *
+      111
+    ) / 100;
+
   const response =
     await axios.post(
       "https://services.sentinel-hub.com/api/v1/process",
@@ -86,7 +93,9 @@ export async function getNDVIImage(
 
                 maxCloudCoverage:
                   20,
-                  mosaickingOrder: "leastCC",
+
+                mosaickingOrder:
+                  "leastCC",
               },
             },
           ],
@@ -237,14 +246,7 @@ export async function getNDVIImage(
         response.data
       ).toString("base64"),
 
-    ndviMean: 0.72,
-    ndviMin: 0.18,
-    ndviMax: 0.91,
-
-    imageDate:
-      today
-        .toISOString()
-        .split("T")[0],
+    areaHa,
   };
 }
 
@@ -263,7 +265,6 @@ export async function getNDVIStats(
   );
 
   try {
-
     const response =
       await axios.post(
         "https://services.sentinel-hub.com/api/v1/statistics",
@@ -373,19 +374,6 @@ export async function getNDVIStats(
           },
         }
       );
-
-    console.log(
-      "PIXELS:",
-      response.data.geometryPixelCount
-    );
-
-    console.log(
-      JSON.stringify(
-        response.data,
-        null,
-        2
-      )
-    );
 
     return response.data;
 
